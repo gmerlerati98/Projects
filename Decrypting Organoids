@@ -1,0 +1,3 @@
+cd /rds/projects/c/continog-continolab-1-sv/organoids/ #First and Foremost the change directory command in order to carry out the following functions where the needed BAM files were
+gpg --batch --yes --ignore-mdc-error --output BAMfile1.gpg.tar.gz --passphrase A25C3C7A0D6011EAA3745629455D77F6 --decrypt BAMfile1.gpg.tar.gz.gpg # The main gpg decrypt command, the one thing to be alert of is each file did have a different unique passcode so that had to be changed each time.
+tar -zxvf BAMfile1.gpg.tar.gz #Simple tar command in order to unzip the gzipped file, the only way the analysis can be conducted is if all the files are unzipped.
