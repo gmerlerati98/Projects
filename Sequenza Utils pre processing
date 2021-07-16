@@ -1,0 +1,5 @@
+sequenza-utils gc_wiggle --fasta genome.fa.gz -w 50 -o genome_gc50.wig.gz
+sequenza-utils bam2seqz --normal normal_sample.bam --tumor tumor_sample.bam \
+    --fasta genome.fa.gz -gc genome_gc50.wig.gz --output sample.seqz.gz
+    sequenza-utils seqz_binning --seqz sample.seqz.gz --window 50 \
+    -o sample_bin50.seqz.gz
