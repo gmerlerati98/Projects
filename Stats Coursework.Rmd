@@ -1,0 +1,257 @@
+---
+title: "Module 1 - Coursework - Final"
+author: "Giuseppe Merlerati"
+date: "15/12/2020"
+output: html_document
+ theme: cosmo
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r Question 1}
+library(tidyverse)
+# 1.1.1
+
+max_turns <- 50 # How many turns a player can take before it breaks the loop.
+
+position <- 0 # Starting position
+max_position <- 100 # The 'end' game point where the player cant progress any further
+n_sides_die <- 6 # maximum number of position you can travel during one turn
+
+for(turn in 1:max_turns ) {# for loop used to iterate over the vector that was created earlier with the max_turns variable.
+  die_roll <- sample.int(n_sides_die, 1)  # assigning the function to the die roll variable. sample.int function used for an integer vector of length size with elements from 1:n, in this case 1:6.
+  position <- position + die_roll # adds a variable to the position of the player by assigning it the value of the die roll plus the current position of the player.
+ if ( position >= max_position ) # if the player reaches 60 which is the max turns, the for loop ends.
+    break # terminates the statement set up by the for loop earlier and the loop is terminated
+
+}    
+  
+```
+
+
+
+
+```{r }
+# 1.1.2 Simulating Snakes and Ladders
+
+position <- 0 
+roll_die <- function(position) {
+ position +  sample(6,1)
+}
+
+
+
+checkforsnakesorladder <- function(position) {
+   case_when(
+      # Ladders (9)
+      position ==  1 ~  38,
+      position ==  4 ~  14,
+      position ==  9 ~  31,
+      position == 21 ~  42,
+      position == 28 ~  84,
+      position == 36 ~  44,
+      position == 51 ~  67,
+      position == 71 ~  91,
+      position == 80 ~ 100,
+      
+      # snake (10)
+      position == 16 ~   6,
+      position == 48 ~  26,
+      position == 49 ~  11,
+      position == 56 ~  53,
+      position == 62 ~  19,
+      position == 64 ~  60,
+      position == 87 ~  24,
+      position == 93 ~  73,
+      position == 95 ~  75,
+      position == 98 ~  78,
+      TRUE ~ position)
+}
+
+
+set.seed(1)
+take_turn <- function(position) {
+   position %>%
+      roll_die() %>% 
+      checkforsnakesorladder()
+}
+# Simulating the game
+simulate_game <- function(game_num = 0) {
+   n <- 50
+   turns <- tibble(turn_num = 1:n,
+                   start    = NA,
+                   roll     = sample(6, n, replace = TRUE),
+                   land     = NA,
+                   snake_or_ladder = NA,
+                   end      = NA)
+   i <- 1
+   keep_playing <- TRUE
+   while(keep_playing) {
+      if (i == 1) {
+         turns$start[[i]] <- 0
+      } else {
+         turns$start[[i]] <- turns$end[[i - 1]]
+      }
+      
+      turns$land[[i]] <- turns$start[[i]] + turns$roll[[i]]
+      turns$end[[i]] <- checkforsnakesorladder(turns$land[[i]])
+      
+      if (turns$land[[i]] > turns$end[[i]]) {
+         turns$snake_or_ladder[[i]] <- "ladder"
+      }  else if (turns$land[[i]] < turns$end[[i]]) {
+         turns$snake_or_ladder[[i]] <- "snake"
+      }  else {
+         turns$snake_or_ladder[[i]] <- NA
+      } 
+      
+      if (turns$end[[i]] >= 100) {
+         keep_playing <- FALSE
+      } else {
+         i <- i + 1
+      }
+   }
+   
+   turns %>%
+      filter(turn_num <= i) %>%
+      return()
+}
+set.seed(1)
+simulate_game()
+#A tibble: 28 x 6
+#turn_num start  roll  land snake_or_ladder   end
+#<int> <dbl> <int> <dbl> <chr>           <dbl>
+   #1        1     0     4     4 snake              14
+#2        2    14     6    20 NA                 20
+#3        3    20     6    26 NA                 26
+#4        4    26     6    32 NA                 32
+#5        5    32     1    33 NA                 33
+#6        6    33     4    37 NA                 37
+#7        7    37     1    38 NA                 38
+#8        8    38     4    42 NA                 42
+#9        9    42     3    45 NA                 45
+#10       10    45     3    48 ladder             26
+
+# This game took 28 turns to be complete for a single player with a max turn of 50
+```
+
+```{r }
+# 1.1.3
+#Simulating a lot of games (100) for repeats
+set.seed(1)
+games <- tibble(game_num = 1:100) %>% 
+   mutate(game = map(game_num, simulate_game)) %>%
+   unnest()
+games
+games_summary <- games %>%
+   group_by(game_num) %>%
+   summarize(turns = max(turn_num),
+             n_snakes  = sum(snake_or_ladder == "snake", na.rm = TRUE),
+             n_ladders = sum(snake_or_ladder == "ladder", na.rm = TRUE))
+games_summary
+
+# Produces the histogram of turns required across repeats
+ggplot(games_summary, aes(turns)) + 
+   geom_histogram(binwidth = 2, fill = "#376092", color = "#132A45") + 
+   scale_x_continuous(breaks = seq(0, 160, 20)) + 
+   scale_y_continuous(breaks = seq(0, 60, 10)) + 
+   labs(title = "Number of turns finish Snakes and Ladders",
+        subtitle = "Based on 100 simulated games",
+        caption = "",
+        y = "number of games")
+
+
+
+```
+```{r }
+# Produces the histogram of turns required across repeats
+ggplot(games_summary, aes(turns)) + 
+   geom_histogram(binwidth = 2, fill = "#376092", color = "#132A45") + 
+   scale_x_continuous(breaks = seq(0, 160, 20)) + 
+   scale_y_continuous(breaks = seq(0, 60, 10)) + 
+   labs(title = "Number of turns finish Snakes and Ladders",
+        subtitle = "Based on 100 simulated games",
+        caption = "",
+        y = "number of games")
+
+```
+```{r }
+
+# 2.0 Expression Data Analysis
+# 2.1 PCA
+library(tidyverse) # opens up the 'tidyverse' package
+
+# load("assess_data_20(1).Rdata") # opens up R objects in the current directory in this case 'asses_data20'
+
+pca_x <- t(log(Y + 1)) # assign the type of algorithmic transformation the data would go through in the PCA
+pca_res1 <- prcomp(pca_x, center = TRUE, scale = TRUE) # prcomp performs the actual PCA function on the data. Center = TRUE; the variable means(means that were substracted) and Scale = TRUE; the varaibe standard deviations (the scaling applied to each variable)
+pc_df1 <- data.frame(pca_res1$x, tissue = patient_data$tissue, # converts the PCA data into a data.frame so its organized in a matrix like structure ready to be plotted.
+                     patient = patient_data$patient)
+
+ggplot(newpc_df1, aes(x = PC1, y = PC2, shape = tissue, col = patient)) + # ggplot function plots the pca data and aes function is the aesthetics customisation, will let you decide what is plotted on the x,y axis.
+   geom_point(size = 6) # adjusts the plot point sizes.
+
+# Based on the scatter plot I can identify that the two problematic plots are Patient 14 - tumor and Patient 1 - normal. These samples can be considered problematic because they are clearly outliers based on the image since they are not anywhere near any of their respective clusters.
+
+# Removing the problematic samples
+newpc_df1 <- pc_df1[-c(14, 16, 1,29),] # this code removes the rows where the outliers are on the dataframe.Then replotted the PCA with the new dataframe
+new_patient_data <- patient_data[-c(14, 16, 1,29),]
+View(new_patient_data)
+
+```
+```{r }
+
+
+library(MASS) # opens up the MASS package, which supports functions and Datasets for Venables and Ripley's MASS
+idx <- 20 
+c_cl <- 1:20
+x <- patient_data$tissue[c_cl] # assigning the x variable the tissue data of the patients specifically in order to plot it later.
+z <- patient_data$patient[c_cl] # assigning the z variable the patinet data (probably the ID).
+tmp <- data.frame(y = Y[idx, c_cl], x = x, z = z, lib_size = colSums(Y[, c_cl])) #Creating a dataframe which is ready to be fitted into the model
+out <- glm(y ~ x + z + lib_size, data = tmp, family = "poisson") # glm function used to fit generalized linear models, in this case we are using poisson regression 
+p_val <- summary(out)$coefficients[2, 4] # calculates the p value using the coefficient values of the data that was fitted into the poisson regression earlier
+
+# Question 3
+idx <- nrow(Y)
+c_cl <- 1:26
+x <- new_patient_data$tissue[c_cl]
+z <- new_patient_data$patient[c_cl]
+transpose_y <- t(Y)
+genes <- nrow(transpose_y)
+results_q3 <- matrix(nrow = genes_n, ncol = 1)
+for (i in 1:genes) {
+   tmp_mm <- data.frame(y = transpose_y[i, c_cl], x = x, z = z, lib_size = colSums((transpose_y[, c_cl])))
+   out_2 <- glm(y ~ x + z + lib_size, data = tmp_mm, family = 'poisson')
+   p_val_3 <- summary(out_2)$coefficients[2,4]
+   results_q3[i] <- p_val_3
+   
+}
+results_q3_df <- data.frame(p_val_3 = results_q3, idx = 1:30)
+ggplot(results_q3_df, aes(x = idx, y = log10(p_val_3))) +
+          geom_point(size = 1, col = 'blue') +
+          labs(y = 'Log10(pvalue)')
+
+# Question 4 
+results_q4 <- matrix(nrow = genes_n, ncol=1)
+for (i in 1:genes) {
+   tmp_mm2 <- data.frame(y = transpose_y[i, c_cl], x = x, z = z, lib_size = colSums(transpose_y[, c_cl]))
+   out_q4 <- glm(y ~ x + lib_size, data = tmp_mm2, family = 'poisson')
+   p_val_q4 <- summary(out_q4)$coefficients[2,4]
+   results[i] <- p_val
+   results_q4[i] <- p_val_q4
+}
+results_q4_df <- data.frame(p_val_q4 = results_q4, idx = 1:30)
+
+ggplot(results_q4_df, aes(x = idx, y = log10(p_val_q4))) +
+   geom_point(size = 1, col = 'red') +
+   labs(y = 'Log10(pvalue)')
+
+# Based on the analysis, we can assume that the tissue type had the biggest effect as a coveriates on the p-values generated
+```
