@@ -1,0 +1,123 @@
+import pandas as pd
+import numpy as np
+
+import matplotlib.pyplot as plt # plotting and visulisation
+import seaborn as sns # nicer (easier) visualisation
+%matplotlib inline
+
+
+# for saving
+import os,os.path
+
+data_dir = '..{}data'.format(os.path.sep)
+
+fn_fpkm             = 'log2FPKM.tsv'
+fn_patient_info     = 'patientInfo.tsv'
+fn_prop_intensities = 'allProbIntensities.tsv'
+
+
+df_fpkm = pd.read_csv('{}/{}'.format(data_dir,fn_fpkm),sep='\t',).rename({'00gene_id':'gene_id'},axis=1)
+df_fpkm = df_fpkm.set_index(['gene_id'])
+df_fpkm.columns = df_fpkm.columns.str.replace(r"_(.*)","")
+df_fpkm.columns.name = 'ID'
+
+df_patient_info = pd.read_csv('{}/{}'.format(data_dir,fn_patient_info),sep='\t').set_index('ID')
+df_patient_info.columns.name = 'FactorValues'
+df_patient_info_train  = df_patient_info[df_patient_info['FactorValue..death.from.disease.'].notna()]
+df_patient_info_test   = df_patient_info[df_patient_info['FactorValue..death.from.disease.'].isna()]
+df_patient_info_train.head()
+
+# transpose, so rows are by patients
+df_fpkm_T2 = df_fpkm.T.reset_index()
+
+df_fpkm_T2['ID'] = df_fpkm_T2['ID'].str.split('_',expand=True)[0]
+df_fpkm_T2 = df_fpkm_T2.set_index(['ID'])
+
+# Normalization to the transposed data
+#from sklearn.preprocessing import StandardScaler
+df_fpkm_T2_std = StandardScaler().fit_transform(df_fpkm_T2)
+df_fpkm_T2_std = pd.DataFrame(df_fpkm_T2_std )
+df_fpkm_T2 = pd.DataFrame(data=df_fpkm_T2_std.values, columns=df_fpkm_T2.columns, index=df_fpkm_T2.index)
+
+# extract X_train and X_test (only for demonstration purposes - no normalisation performed at all!!!)
+X_train = df_fpkm_T2.loc[df_patient_info_train.index]
+X_test  = df_fpkm_T2.loc[df_patient_info_test.index]
+
+#X_test.head()
+
+# endpoint: death
+endpoint = 'FactorValue..death.from.disease.'
+y_train = df_patient_info_train[endpoint].astype(int)
+
+
+######## PARAMETER SEARCH WITH GRID ############ I did a couple of search before to find better parameters
+param_grid = {
+    'max_depth':[None],
+    'criterion':('gini', 'entropy'),
+    'max_features': ["sqrt"],
+    'min_samples_leaf': [2,10],
+    'min_samples_split': [8, 10, 12],
+    'n_estimators': [500]
+}
+
+kfolds = StratifiedKFold(5, random_state=11, shuffle=True)
+random_f_model = RandomForestClassifier(random_state = 11)
+rf = GridSearchCV(random_f_model, param_grid, scoring='balanced_accuracy', cv=kfolds.split(X_train,y_train))
+rf.fit(X_train, y_train.values.ravel())
+
+best_result = max(rf.cv_results_['mean_test_score'])
+best_result
+
+
+best_tree_model = rf.best_estimator_ # best model according to grid search 
+
+best_tree_model.get_params()
+
+
+#################### SEE THE SELECTED FEATURES WITH 0.001 Threshold (why that threshold? I have chosen that one! Try something else and see!)##########
+for feature_name,feature_importance in zip(df_fpkm_T2.columns.values,best_tree_model.feature_importances_):
+    if feature_importance > 0.001:
+        print('{:20s}:{:3.4f}'.format(feature_name,feature_importance))
+
+plt.figure(figsize=(20,10))
+
+sns.barplot(x='column_name',y='feature_importance',data=df_importance.reset_index(),palette='muted')
+ticks_information = plt.xticks(rotation=65)
+
+plt.figure(figsize=(20,10))
+
+sns.barplot(x='column_name',y='feature_importance',data=df_importance.reset_index(),palette='muted')
+ticks_information = plt.xticks(rotation=65)
+
+############################################
+
+# create an empty DataFrame to store predictions and scores for all endpoints
+df_patient_info_test_predictions = pd.DataFrame(index=df_patient_info_test.index)
+
+# predict death for the test set patients
+df_patient_info_test_predictions.loc[X_test.index,'{}prediction'.format(endpoint)]  = best_tree_model.predict(X_test)
+
+# us the prediction score for positive (True) values - please check if it is the same order for you
+df_patient_info_test_predictions.loc[X_test.index,'{}prediction_score'.format(endpoint)]  = best_tree_model.predict_proba(X_test)[:,1]
+
+df_patient_info_test_predictions.head(30)
+
+
+def save_predictions(dataframe,group_number=-1,data_origin='undefined',output_dir='predictions'):
+    # check for correct group number
+    if not (group_number > 0 and group_number<6):
+        raise Exception('Wrong group number')
+    # check for allowed data origin
+    if data_origin not in ['mirocarray', 'rnaseq', 'other']:
+        raise Exception("data_origin can only be one of 'mirocarray', 'rnaseq' or 'other'")
+
+    # check if outout_dir exists - if not create - if permission do not allow that, this raises an error
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    outfile_name = 'msc_bio_m3_group_{}_data_{}.tsv'.format(str(group_number).zfill(2),data_origin)
+    full_outfile_path = '{}{}{}'.format(output_dir,os.path.sep,outfile_name)
+    dataframe.to_csv(full_outfile_path,sep='\t')
+    return full_outfile_path
+
+save_predictions(df_patient_info_test_predictions,2,'rnaseq','my_submissions')
